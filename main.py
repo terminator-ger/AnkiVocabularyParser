@@ -14,8 +14,6 @@ class VocParser:
         result = self.ocr.predict(
             input=img)
         
-        #cluster cols
-        
         # Visualize the results and save the JSON results
         for res in result:
             res.print()

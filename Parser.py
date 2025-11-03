@@ -1,0 +1,116 @@
+# Initialize PaddleOCR instance
+from sklearn.cluster import KMeans
+import json
+import numpy as np
+from scipy.spatial import distance_matrix
+import re
+
+class Parser:
+    def __init__(self):
+        None
+    
+    def parse(self, json_file, num_rows=4):
+        data = json.load(open(json_file, 'r', encoding='utf-8'))
+
+        km = KMeans(n_clusters=num_rows, random_state=0)
+        x_left = [poly[0][0] for poly in data['rec_polys']]
+        y_left = [poly[0][1] for poly in data['rec_polys']]
+        x_left = np.array(x_left).reshape(-1, 1)
+        km.fit_predict(x_left)
+
+        text = [[] for _ in range(num_rows)]
+        boxes = [[] for _ in range(num_rows)]
+        for idx, j in enumerate(km.labels_):
+                text[j].append(data['rec_texts'][idx])
+                boxes[j].append(data['rec_polys'][idx])
+        # order clusters left to right
+        cluster_centers = km.cluster_centers_.flatten() 
+        sorted_indices = np.argsort(cluster_centers)
+        text = [text[i] for i in sorted_indices]
+        boxes = [boxes[i] for i in sorted_indices]
+
+        #sort text and boxed top to bottom within each cluster 
+        for i in range(num_rows):
+            y_coords = [box[0][1] for box in boxes[i]]
+            sorted_indices = np.argsort(y_coords)
+            text[i] = [text[i][j].strip() for j in sorted_indices]
+            boxes[i] = [boxes[i][j] for j in sorted_indices]
+
+        text = [self.re_filter(txt) for txt in text]
+        box_centers = [self.calc_box_centers(box) for box in boxes]
+        boxes_merged, text_merged = [self.merge(bc, t) for bc,t in zip(box_centers, text)]
+
+        results = [self.fifo_match(boxes_merged.pop(), text_merged.pop(), boxes_merged.pop(), text_merged.pop()) for _ in range(len(boxes)//2)]
+        return results
+    
+    def re_filter(self, text):
+        lection_number_pattern = re.compile(r'\d.')
+        for j in range(len(text)):
+            text[j] = re.sub(lection_number_pattern, '', text[j]).strip() 
+        return text
+
+       
+    def calc_box_centers(self, boxes): 
+        return [[(b[0][0]+b[3][0])/2, (b[0][1] + b[3][1]) / 2] for b in boxes[0]]
+
+
+    def merge(self, box, text):
+        avg_dist = np.median((np.asarray(box)[:,1]-np.roll(np.asarray(box)[:,1], 1))[1:])
+        idx = 0
+        merged_box = [None for _ in box]
+        merged_text = [None for _ in text]
+        while idx < len(box):
+            b0, t0 = box[idx], text[idx]
+            if idx+1 >= len(box) :
+                return box, text
+            b1, t1 = box[idx+1], text[idx+1]
+            
+            if np.abs(b0[1]-b1[1]) < avg_dist//4:
+                # join left to right
+                if b0[0] < b1[0]:
+                    box[idx] = np.mean([b0, b1],0)
+                    text[idx] = " ".join([t0,t1])
+                else:
+                    box[idx] = np.mean([b1,b0],0)
+                    text[idx] = " ".join([t1,t0])
+                box.pop(idx+1)
+                text.pop(idx+1)
+            idx += 1
+        
+        return box, text               
+
+
+    def fifo_match(self, box0, text0, box1, text1):
+        avg_dist = np.median((np.asarray(box0)[:,1]-np.roll(np.asarray(box0)[:,1], 1))[1:])
+        results = []
+        b0, it = box0.pop(0), text0.pop(0)
+        b1, de = box1.pop(0), text1.pop(0)
+        while True:
+            if np.abs(b0[1] - b1[1]) < avg_dist//2:
+                results.append([[it],[de]])
+                b0, it = box0.pop(0), text0.pop(0)
+                b1, de = box1.pop(0), text1.pop(0)
+
+            elif b0[1] < b1[1]:
+                results[-1][0].append(it)
+                if len(box0) > 0:
+                    b0, it = box0.pop(0), text0.pop(0)
+                else:
+                    b1, de = box1.pop(0), text1.pop(0)
+     
+            elif b0[1] > b1[1]:
+                results[-1][1].append(de)
+                if len(box1) > 0:
+                    b1, de = box1.pop(0), text1.pop(0)
+                else:
+                    b0, it = box0.pop(0), text0.pop(0)
+
+            if len(box0) == 0 and len(box1) == 0:
+                for idx, (it, de) in enumerate(results):
+                    if len(it) > 1:
+                        results[idx][0] = ["<br>".join(it)]
+                    if len(de) > 1:
+                        results[idx][1] = ["<br>".join(de)]
+                    results[idx][0] = f"\"{results[idx][0][0]}\""
+                    results[idx][1] = f"\"{results[idx][1][0]}\""
+                return results 
