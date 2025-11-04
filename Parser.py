@@ -1,5 +1,5 @@
 # Initialize PaddleOCR instance
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, OPTICS, AgglomerativeClustering
 import json
 import numpy as np
 from scipy.spatial import distance_matrix
@@ -9,22 +9,27 @@ class Parser:
     def __init__(self):
         None
     
-    def parse(self, json_file, num_rows=4):
+    def parse(self, json_file):
         data = json.load(open(json_file, 'r', encoding='utf-8'))
 
-        km = KMeans(n_clusters=num_rows, random_state=0)
+        cluster = AgglomerativeClustering(n_clusters=None, 
+                                          linkage="complete", 
+                                          distance_threshold=25)
         x_left = [poly[0][0] for poly in data['rec_polys']]
         y_left = [poly[0][1] for poly in data['rec_polys']]
         x_left = np.array(x_left).reshape(-1, 1)
-        km.fit_predict(x_left)
+        #x_left_normalized = (x_left - np.min(x_left)) / (np.max(x_left) - np.min(x_left))
+        cluster.fit_predict(x_left)
+        num_rows = len(set(cluster.labels_))
 
         text = [[] for _ in range(num_rows)]
         boxes = [[] for _ in range(num_rows)]
-        for idx, j in enumerate(km.labels_):
+        for idx, j in enumerate(cluster.labels_):
                 text[j].append(data['rec_texts'][idx])
                 boxes[j].append(data['rec_polys'][idx])
         # order clusters left to right
-        cluster_centers = km.cluster_centers_.flatten() 
+        #cluster_centers = cluster.cluster_centers_.flatten() 
+        cluster_centers = [np.median(x_left[np.array(cluster.labels_)==i]) for i in range(num_rows)]
         sorted_indices = np.argsort(cluster_centers)
         text = [text[i] for i in sorted_indices]
         boxes = [boxes[i] for i in sorted_indices]
@@ -38,9 +43,14 @@ class Parser:
 
         text = [self.re_filter(txt) for txt in text]
         box_centers = [self.calc_box_centers(box) for box in boxes]
-        boxes_merged, text_merged = [self.merge(bc, t) for bc,t in zip(box_centers, text)]
+        merged = [self.merge(bc, t) for bc,t in zip(box_centers, text)]
+        boxes_merged = [m[0] for m in merged]
+        text_merged = [m[1] for m in merged]
 
-        results = [self.fifo_match(boxes_merged.pop(), text_merged.pop(), boxes_merged.pop(), text_merged.pop()) for _ in range(len(boxes)//2)]
+        results = [self.fifo_match(boxes_merged.pop(0), 
+                                   text_merged.pop(0), 
+                                   boxes_merged.pop(0), 
+                                   text_merged.pop(0)) for _ in range(len(boxes)//2)]
         return results
     
     def re_filter(self, text):
@@ -51,14 +61,12 @@ class Parser:
 
        
     def calc_box_centers(self, boxes): 
-        return [[(b[0][0]+b[3][0])/2, (b[0][1] + b[3][1]) / 2] for b in boxes[0]]
+        return [[(b[0][0]+b[3][0])/2, (b[0][1] + b[3][1]) / 2] for b in boxes]
 
 
     def merge(self, box, text):
         avg_dist = np.median((np.asarray(box)[:,1]-np.roll(np.asarray(box)[:,1], 1))[1:])
         idx = 0
-        merged_box = [None for _ in box]
-        merged_text = [None for _ in text]
         while idx < len(box):
             b0, t0 = box[idx], text[idx]
             if idx+1 >= len(box) :
@@ -88,8 +96,11 @@ class Parser:
         while True:
             if np.abs(b0[1] - b1[1]) < avg_dist//2:
                 results.append([[it],[de]])
-                b0, it = box0.pop(0), text0.pop(0)
-                b1, de = box1.pop(0), text1.pop(0)
+                # try to pop next from both
+                if len(box0) > 0:
+                    b0, it = box0.pop(0), text0.pop(0)
+                if len(box1) > 0:
+                    b1, de = box1.pop(0), text1.pop(0)
 
             elif b0[1] < b1[1]:
                 results[-1][0].append(it)
@@ -114,3 +125,11 @@ class Parser:
                     results[idx][0] = f"\"{results[idx][0][0]}\""
                     results[idx][1] = f"\"{results[idx][1][0]}\""
                 return results 
+            
+            
+if __name__ == '__main__':
+    parser = Parser()
+    results = parser.parse("output/1_bevenuti_1_res.json")
+    for list in results:
+        for it, de in list:
+            print(f"IT: {it} | DE: {de}")
