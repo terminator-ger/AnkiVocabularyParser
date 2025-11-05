@@ -1,73 +1,73 @@
 # Initialize PaddleOCR instance
 
-from Exporter import Exporter
+from Exporter import AnkiExporter
 from OCR import PaddleOCRWrapper as OCR
 from Parser import Parser
 from tqdm import tqdm
 
 if __name__ == "__main__":
     parser = Parser()
-    ocr = OCR()
-    exporter = Exporter()
+    #ocr = OCR()
+    exporter = AnkiExporter("Fantastico! A1", lang0="IT", lang1="DE")
     
     voc_list = {
-        #"Bevenuti":[
-        #    "input/1_bevenuti_1.PNG",
-        #    "input/1_bevenuti_2.PNG",],
-        #"PrimoIncontro":[
-        #    "input/2_primo_incontro_1.PNG",
-        #    "input/2_primo_incontro_2.PNG",
-        #    "input/2_primo_incontro_3.PNG"],
-        #"CheProfumo":[
-        #    "input/3_che_profumo_1.PNG",
-        #    "input/3_che_profumo_2.PNG",
-        #    "input/3_che_profumo_3.PNG"],
-        "UnAlbergo":[
+        "00 - Bevenuti":[
+            "input/1_bevenuti_1.PNG",
+            "input/1_bevenuti_2.PNG",],
+        "01 - Primo in contro":[
+            "input/2_primo_incontro_1.PNG",
+            "input/2_primo_incontro_2.PNG",
+            "input/2_primo_incontro_3.PNG"],
+        "02 - Un albergo":[
             "input/3_un_albergo_1.PNG",
             "input/3_un_albergo_2.PNG",
             "input/3_un_albergo_3.PNG"],
-        "NomiCosiCitta":[
+        "03 - Che profumo":[
+            "input/3_che_profumo_1.PNG",
+            "input/3_che_profumo_2.PNG",
+            "input/3_che_profumo_3.PNG"],
+       "04 - Nomi cosi citta":[
             "input/4_nomi_cosi_citta_1.PNG",
             "input/4_nomi_cosi_citta_2.PNG",],
-        "Rivediamo":[
+        "05 - Rivediamo 1":[
             "input/5_rivediamo_1.PNG",],
-        "DoveFaiLaSpessa":[
+        "06 - Dove fai la spessa":[
             "input/6_dove_fai_la_spessa_1.PNG",
             "input/6_dove_fai_la_spessa_2.PNG",
             "input/6_dove_fai_la_spessa_3.PNG",],
-        "TiPiace":[
+        "07 - Ti piace":[
             "input/7_ti_piace_1.PNG",
             "input/7_ti_piace_2.PNG",
             "input/7_ti_piace_3.PNG",],
-        "EStatoFantastico":[
+        "08 - E stato fantastico":[
             "input/8_e_stato_fantastico_1.PNG",
             "input/8_e_stato_fantastico_2.PNG",
             "input/8_e_stato_fantastico_3.PNG",
             "input/8_e_stato_fantastico_4.PNG",],
-        "AriaDiVacanza":[
+        "09 - Aria di vacanza":[
             "input/9_aria_di_vacanza_1.PNG",
             "input/9_aria_di_vacanza_2.PNG",
             "input/9_aria_di_vacanza_3.PNG",],
-        "Rivediamo2":[
+        "10 - Rivediamo 2":[
             "input/10_rivediamo_1.PNG",],
-        "QuiSiMangiaBene":[
+        "11 - Qui si mangia bene":[
             "input/11_qui_si_mangia_bene_1.PNG",
             "input/11_qui_si_mangia_bene_2.PNG",
             "input/11_qui_si_mangia_bene_3.PNG",
             "input/11_qui_si_mangia_bene_4.PNG",],
-        "ComeMiSta":[
+        "12 - Come mi sta":[
             "input/12_come_mi_sta_1.PNG",
             "input/12_come_mi_sta_2.PNG",
             "input/12_come_mi_sta_3.PNG",],
-        "TuttiInForma":[
+        "13 - Tutti in forma":[
             "input/13_tutti_in_forma_1.PNG",
             "input/13_tutti_in_forma_2.PNG",
             "input/13_tutti_in_forma_3.PNG",],
-        "ComeACasa":[
+        "14 - Come a casa":[
             "input/14_come_a_casa_1.PNG",
             "input/14_come_a_casa_2.PNG",
             "input/14_come_a_casa_3.PNG",],
-        "Rivediamo3":[
+        "15 - Rivediamo 3":[
             "input/15_rivediamo_1.PNG",
         ]}
     bar0 = tqdm(total=len(voc_list),position=0) 
@@ -83,5 +83,5 @@ if __name__ == "__main__":
             results = parser.parse(parsed_ocr) 
             for result in results:
                 exporter.add(result)
-        exporter.save(f"processed/{lection}.txt")
+        exporter.save(f"{lection}")
     

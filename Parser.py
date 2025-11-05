@@ -13,7 +13,7 @@ class Parser:
         data = json.load(open(json_file, 'r', encoding='utf-8'))
 
         cluster = AgglomerativeClustering(n_clusters=None, 
-                                          linkage="complete", 
+                                          linkage="single", 
                                           distance_threshold=25)
         x_left = [poly[0][0] for poly in data['rec_polys']]
         y_left = [poly[0][1] for poly in data['rec_polys']]
@@ -51,7 +51,19 @@ class Parser:
                                    text_merged.pop(0), 
                                    boxes_merged.pop(0), 
                                    text_merged.pop(0)) for _ in range(len(boxes)//2)]
+        
+        results = [self.add_html(res) for res in results]
         return results
+    
+    def add_html(self, results):
+        for idx, (it, de) in enumerate(results):
+            if " pl " in it:
+                results[idx][0] = it.replace(" pl ", " <i> pl ").replace("\"", "") + " </i>"
+                results[idx][0] = f"\"{results[idx][0]}\""
+            if " inf " in it:
+                results[idx][0] = it.replace(" inf ", " <i> inf ").replace("\"", "") + " </i>"
+                results[idx][0] = f"\"{results[idx][0]}\""
+        return results 
     
     def re_filter(self, text):
         lection_number_pattern = re.compile(r'\d.')
@@ -91,37 +103,51 @@ class Parser:
     def fifo_match(self, box0, text0, box1, text1):
         avg_dist = np.median((np.asarray(box0)[:,1]-np.roll(np.asarray(box0)[:,1], 1))[1:])
         results = []
-        b0, it = box0.pop(0), text0.pop(0)
-        b1, de = box1.pop(0), text1.pop(0)
+        b0 = box0[0]
+        b1 = box1[0]
+        last0 = False
+        last1 = False
         while True:
+            # lookahead if both boxes are close enough in y axis
+            if len(box0) > 0:
+                b0 = box0[0]
+            if len(box1) > 0:
+                b1 = box1[0]
+            if len(box0) == 0:
+                last0 = True
+            if len(box1) == 0:
+                last1 = True
+
             if np.abs(b0[1] - b1[1]) < avg_dist//2:
+                b0, it = box0.pop(0), text0.pop(0)
+                b1, de = box1.pop(0), text1.pop(0)
                 results.append([[it],[de]])
-                # try to pop next from both
-                if len(box0) > 0:
-                    b0, it = box0.pop(0), text0.pop(0)
-                if len(box1) > 0:
-                    b1, de = box1.pop(0), text1.pop(0)
 
-            elif b0[1] < b1[1]:
+            elif not last0 and b0[1] < b1[1]:
+                b0, it = box0.pop(0), text0.pop(0)
                 results[-1][0].append(it)
-                if len(box0) > 0:
-                    b0, it = box0.pop(0), text0.pop(0)
-                else:
-                    b1, de = box1.pop(0), text1.pop(0)
+                    
      
-            elif b0[1] > b1[1]:
-                results[-1][1].append(de)
+            elif not last1 and b0[1] > b1[1]:
                 if len(box1) > 0:
                     b1, de = box1.pop(0), text1.pop(0)
-                else:
-                    b0, it = box0.pop(0), text0.pop(0)
+                    results[-1][1].append(de)
+                    
+            elif last0 and len(box1) > 0:
+                b1, de = box1.pop(0), text1.pop(0)
+                results[-1][1].append(de)
 
+            elif last1 and len(box0) > 0:
+                b0, it = box0.pop(0), text0.pop(0)
+                results[-1][0].append(it)
+                    
+                    
             if len(box0) == 0 and len(box1) == 0:
                 for idx, (it, de) in enumerate(results):
                     if len(it) > 1:
-                        results[idx][0] = ["<br>".join(it)]
+                        results[idx][0] = [" <br> ".join(it)]
                     if len(de) > 1:
-                        results[idx][1] = ["<br>".join(de)]
+                        results[idx][1] = [" <br> ".join(de)]
                     results[idx][0] = f"\"{results[idx][0][0]}\""
                     results[idx][1] = f"\"{results[idx][1][0]}\""
                 return results 
