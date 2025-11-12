@@ -42,9 +42,34 @@ class AnkiVocParser:
 
 
 
+<<<<<<<< HEAD:AnkiVocabularyParser/__main__.py
 if __name__ == "__main__":
     args = parse_arguments()
     avp = AnkiVocParser(args)
+========
+
+def main(title, lang0, lang1, voc_list):
+    parser = Parser()
+    ocr = OCR()
+    exporter = AnkiExporter(title)
+ 
+    bar0 = tqdm(total=len(voc_list),position=0) 
+    for lection, img_list in voc_list.items():
+        bar0.set_description(f"Processing {lection}")
+        bar0.update(1)
+        bar1 = tqdm(total=len(img_list),position=1) 
+        for img_path in img_list:
+            bar1.set_description(f"  Processing {img_path}")
+            bar1.update(1)
+            parsed_ocr = ocr.read(img_path)
+            #parsed_ocr = img_path.replace("input/", "output/").removesuffix(".PNG") + "_res.json"
+            results = parser.parse(parsed_ocr) 
+            for result in results:
+                exporter.add(result)
+        exporter.save(f"{lection}")
+ 
+if __name__ == "__main__":
+>>>>>>>> 091b9f3767310a91e80c1389993e41355103ad75:anki_voc_parser/main.py
     voc_list = {
         "00 - Bevenuti":[
             "input/1_bevenuti_1.PNG",
@@ -105,4 +130,8 @@ if __name__ == "__main__":
         "15 - Rivediamo 3":[
             "input/15_rivediamo_1.PNG",
         ]}
+<<<<<<<< HEAD:AnkiVocabularyParser/__main__.py
     avp.run(voc_list)
+========
+    main("Fantastico! A1", "it", "de", voc_list)
+>>>>>>>> 091b9f3767310a91e80c1389993e41355103ad75:anki_voc_parser/main.py
